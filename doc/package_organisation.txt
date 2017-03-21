@@ -1,0 +1,19 @@
+# http://infinitemonkeycorps.net/docs/pph/ 
+
+
+googlemaps/                 # Project Hosting
+    .svn/                   # Version Control
+    googlemaps/             # Quality Code
+        googlemaps.py
+    test/                   # Unit Testing
+        test_googlemaps.py
+    doc/                    # Documentation
+        index.rst
+    html/
+        index.html
+    README.txt
+    LICENSE.txt             # Licensing
+    setup.py                # Packaging
+    MANIFEST.in
+
+
