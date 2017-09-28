@@ -1,5 +1,6 @@
 ''' Collection of functions to manipulate common tasks in Pandas DataFrames
 '''
+import pandas as pd
 
 def convert2category(column, label_order):
     ''' convert column to a category and set the order of the labels

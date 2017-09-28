@@ -1,17 +1,13 @@
 ''' Alter or add elements of/to a seaborn plot
 '''
-import matplotlib as mpl
-# allows one to run matplotlib and seaborn headless (Cygwin)
-mpl.use('Agg') 
-import matplotlib.pyplot as plt
+import matplotlib as mpl; mpl.use('Agg') 
+from matplotlib.lines import Line2D
 import numpy as np
 import PIL
-import textwrap
 from PIL import ImageDraw, ImageFont, Image
 import logging
 
-
-def rename_xtick(df, col, counts=True,  name2label={}, order=[]):
+def rename_xtick(df, col, counts=True, name2label={}, order=[]):
     ''' Get the value counts of each unique entry in the given column
         and store it in a list along with the values name.
         
@@ -37,14 +33,14 @@ def rename_xtick(df, col, counts=True,  name2label={}, order=[]):
     '''
     if not order:
         order = df[col].unique()
-   
+
     if df[col].dtypes.name != 'category':
-        df[col] = convert2category(df[col], order)
-    
+        convert = df[col].astype('category')
+        df[col] = convert.cat.set_categories(order)
+
     # store the value counts of the col entries
     sizes = df.groupby(col).size().iteritems()
-    
-    if counts is True:
+    if counts:
         name_count = [(name+"\n"+"n = "+str(n)) for name, n in sizes]
     else:
         name_count = [(name+"\n") for name, n in sizes]
@@ -61,36 +57,42 @@ def rename_xtick(df, col, counts=True,  name2label={}, order=[]):
     logging.warning("Ensure xticks are renamed as expected!")                    
     return name_change
 
+def line_between_plots(axs, x1, x2, height, string, fontsize=12, extend=2):
+    ''' Draw a horizontal line and string between two points with 
+        vertical lines that extend at said points e.g.
+ 
+                      p=0.02
+                 ---------------
+                |               |
+ 
+    Args:
+        axs: list of axes to draw upon
+        x1: start of horizontal line
+        x2: end of horizontal line
+        height: where on the y-axis the horizonatl line be drwan
+        string: text to place in the middle of the horizontal line
+        fontsize: fontsize of the string
+        extend: points to extend the vertical lines by
 
-
-
-def lines_between_plots(df, x1, x2, height, vertical, column, value): 
-    ''' Place floating lines between two plots at a given
-        height and line height and place a given value about 
-        said line.
-
-    Args: 
-        x1: x-pos to start from 
-        x2: x-pos to end at
-        height: y-pos at which the vertical line will begin from
-        vertical: length of the vertical lines
-        columns: DataFrame column name
-        value: string to place atop the horizontal line
-        
     Notes:
-        taken from http://tinyurl.com/zpjtbjz
-    
-    Returns:
-        lines between two points on an existing plot which uses
-        the given df and column data
+        if this drawing is not visible on your axes then you may
+        have to manually set the ylim to ensure it is visible.
     '''
-    y, h, col = height, vertical, 'k'
-    plt.plot([x1, x1, x2, x2], [y, y+h, y+h, y], lw=1.5, c=col)
-    plt.text((x1+x2)*.5, y+h, value, ha='center', va='bottom', color=col)
+    if not isinstance(axs, list):
+        axs = [axs]
 
+    for ax in axs:
+        ax.add_line(Line2D(xdata=[x1, x2], ydata=[height, height], color='black'))
+        ax.add_line(Line2D(xdata=[x1, x1], ydata=[height-extend, height], color='black'))
+        ax.add_line(Line2D(xdata=[x2, x2], ydata=[height-extend, height], color='black'))
+        # add string in the middle of horizontal line
+        between_points = (x2+x1)/2
+        ax.text(x=between_points, y=height+(height*0.01), 
+                s=string, fontsize=fontsize,
+                horizontalalignment='center')
+        return ax
 
-
-def RoundToSigFigs( x, sigfigs ):
+def RoundToSigFigs(x, sigfigs):
     ''' Rounds the value(s) in x to the number of significant figures in sigfigs.
     
     Args:
@@ -102,25 +104,23 @@ def RoundToSigFigs( x, sigfigs ):
         x must be a real value or an array like object containing only real values.
     '''
     __logBase10of2 = 3.010299956639811952137388947244930267681898814621085413104274611e-1
-    if not ( type(sigfigs) is int or np.issubdtype(sigfigs, np.integer)):
-        raise TypeError( "RoundToSigFigs: sigfigs must be an integer." )
+    if not (type(sigfigs) is int or np.issubdtype(sigfigs, np.integer)):
+        raise TypeError("RoundToSigFigs: sigfigs must be an integer.")
 
-    if not np.all(np.isreal( x )):
-        raise TypeError( "RoundToSigFigs: all x must be real." )
+    if not np.all(np.isreal(x)):
+        raise TypeError("RoundToSigFigs: all x must be real.")
 
     if sigfigs <= 0:
-        raise ValueError( "RoundtoSigFigs: sigfigs must be positive." )
+        raise ValueError("RoundtoSigFigs: sigfigs must be positive.")
 
-    mantissas, binaryExponents = np.frexp( x )
+    mantissas, binaryExponents = np.frexp(x)
 
     decimalExponents = __logBase10of2 * binaryExponents
     intParts = np.floor(decimalExponents)
 
     mantissas *= 10.0**(decimalExponents - intParts)
 
-    return np.around( mantissas, decimals=sigfigs - 1 ) * 10.0**intParts
-
-
+    return np.around(mantissas, decimals=sigfigs - 1) * 10.0**intParts
 
 def create_subplot(files, outfile, size=(2000,1600), sub_fig=None, font="Verdana.ttf"):
     ''' Merge multiple images of similar size into one image 
@@ -171,7 +171,6 @@ def create_subplot(files, outfile, size=(2000,1600), sub_fig=None, font="Verdana
 
     canvas.save(outfile)
 
-
 def correct_size(f, size):
     ''' Adjust the given size so that the given files can fit 
         closely side by side within a subplot.
@@ -185,14 +184,12 @@ def correct_size(f, size):
     
     '''
     # get the average width and height for all parsed image files
-    avg_w = sum([Image.open(size).size[0]for size in f]) /len(f)
-    avg_h = sum([Image.open(size).size[1]for size in f]) /len(f)
-    
+    avg_w = sum([Image.open(s).size[0]for s in f]) /len(f)
+    avg_h = sum([Image.open(s).size[1]for s in f]) /len(f)
     # calulate the ratio of width to height and use ratio to recalculate height
     r = avg_w/avg_h
     w, h = size
     h = int((w/r)*(4/len(f)))
-    
     return (w, h)
     
 
@@ -213,16 +210,11 @@ def figure_box(f, msg, outfile, extend=100, font="Verdana.ttf", font_size=20, x_
     x, y = img.size
     result = PIL.Image.new("RGB", (x, y+extend), 'white')
     result.paste(img, (0, 0))
-
     fnt = PIL.ImageFont.truetype(font, font_size)
     draw_word_wrap(img=result, text=msg, 
                    xpos=0+x_text, ypos=y, 
                    max_width=x-(x_text*2), font=fnt)
-
-
     result.save(outfile)
-
-
 
 def draw_word_wrap(img, text, xpos=0, ypos=0, max_width=130, fill=(0,0,0), 
                    font=ImageFont.truetype("Verdana.ttf", 50)):
@@ -242,15 +234,12 @@ def draw_word_wrap(img, text, xpos=0, ypos=0, max_width=130, fill=(0,0,0),
     Notes:
         Taken from: https://gist.github.com/atorkhov/5403562
     '''
-
     draw = PIL.ImageDraw.Draw(img)
     text_size_x, text_size_y = draw.textsize(text, font=font)
     remaining = max_width
     space_width, space_height = draw.textsize(' ', font=font)
-
     # use this list as a stack, push/popping each line
     output_text = []
-
     # split on whitespace...    
     for word in text.split(None):
         word_width, word_height = draw.textsize(word, font=font)
@@ -265,11 +254,9 @@ def draw_word_wrap(img, text, xpos=0, ypos=0, max_width=130, fill=(0,0,0),
                 output += ' %s' % word
                 output_text.append(output)
             remaining = remaining - (word_width + space_width)
-
     for text in output_text:
         draw.text((xpos, ypos), text, font=font, fill=fill)
         ypos += text_size_y
-
 
 def convert2grayscale(f):
     ''' Convert a colour image to grascale
@@ -282,5 +269,3 @@ def convert2grayscale(f):
     '''
     img = Image.open(f).convert('LA')
     img.save(f)
-
-
